@@ -94,7 +94,7 @@ sys.path.insert(0, os.path.abspath(Path("repos/gptq")))
 from gptj import load_quant as gptj_load_quant
 from gptneox import load_quant as gptneox_load_quant
 from llama import load_quant as llama_load_quant
-vars_4bit = {}
+from opt import load_quant as opt_load_quant
 
 
 if lupa.LUA_VERSION[:2] != (5, 4):
@@ -3144,6 +3144,9 @@ def load_model(use_gpu=True, gpu_layers=None, disk_layers=None, initial_load=Fal
                             elif koboldai_vars.model_type == "llama":
                                 model = llama_load_quant(koboldai_vars.custmodpth, path_4bit, 4)
                                 tokenizer = LlamaTokenizer.from_pretrained(koboldai_vars.custmodpth)
+                            elif koboldai_vars.model_type == "opt":
+                                model = opt_load_quant(koboldai_vars.custmodpth, path_4bit, 4)
+                                tokenizer = AutoTokenizer.from_pretrained(koboldai_vars.custmodpth)
                             else:
                                 raise RuntimeError(f"4-bit load failed. Model type {koboldai_vars.model_type} not supported in 4-bit")
                         else:
