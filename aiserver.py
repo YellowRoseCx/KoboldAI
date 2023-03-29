@@ -2661,7 +2661,6 @@ def unload_model():
 
 def prepare_4bit_load(modelpath):
     paths_4bit = ["4bit.pt", "4bit.safetensors"]
-    paths_4bit_old = ["4bit-old.pt", "4bit-old.safetensors"]
     result = False
     for p in paths_4bit:
         p = os.path.join(modelpath, p)
@@ -2669,36 +2668,9 @@ def prepare_4bit_load(modelpath):
             result = p
             break
 
-    global monkey_patched_4bit
-
-    # Monkey-patch in old-format pt-file support
     if not result:
-        print(f"4-bit file not found, falling back to old 4-bit format")
-        for p in paths_4bit_old:
-            p = os.path.join(modelpath, p)
-            if os.path.isfile(p):
-                result = p
-                break
-
-        if not result:
-            print(f"4-bit old-format file not found, loading failed")
-            raise RuntimeError(f"4-bit load failed. PT-File not found.")
-
-        import llama, opt, gptneox, gptj, old_quant
-        llama.make_quant = old_quant.old_make_quant
-        opt.make_quant = old_quant.old_make_quant
-        gptneox.make_quant = old_quant.old_make_quant
-        gptj.make_quant = old_quant.old_make_quant
-        monkey_patched_4bit = True
-    elif monkey_patched_4bit:
-        # Undo monkey patch
-        print("Undoing 4-bit old format monkey patch")
-        import llama, opt, gptneox, gptj, quant
-        llama.make_quant = quant.make_quant
-        opt.make_quant = quant.make_quant
-        gptneox.make_quant = quant.make_quant
-        gptj.make_quant = quant.make_quant
-        monkey_patched_4bit = False
+        print("4-bit file not found, loading failed")
+        raise RuntimeError("4-bit load failed. PT-File not found.")
 
     return result
     
