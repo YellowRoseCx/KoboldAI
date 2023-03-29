@@ -2660,7 +2660,7 @@ def unload_model():
 
 
 def prepare_4bit_load(modelpath):
-    paths_4bit = ["4bit.pt"]
+    paths_4bit = ["4bit.safetensors", "4bit.pt"]
     result = False
     for p in paths_4bit:
         p = os.path.join(modelpath, p)
