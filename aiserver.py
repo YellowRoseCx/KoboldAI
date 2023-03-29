@@ -2660,7 +2660,7 @@ def unload_model():
 
 
 def prepare_4bit_load(modelpath):
-    paths_4bit = ["4bit.pt", "4bit.safetensors"]
+    paths_4bit = ["4bit.pt"]
     result = False
     for p in paths_4bit:
         p = os.path.join(modelpath, p)
@@ -3162,6 +3162,8 @@ def load_model(use_gpu=True, gpu_layers=None, disk_layers=None, initial_load=Fal
                                 tokenizer = AutoTokenizer.from_pretrained(koboldai_vars.custmodpth)
                             else:
                                 raise RuntimeError(f"4-bit load failed. Model type {koboldai_vars.model_type} not supported in 4-bit")
+
+                            model = model.half()
                         else:
                             try:
                                 tokenizer = AutoTokenizer.from_pretrained(koboldai_vars.custmodpth, revision=koboldai_vars.revision, cache_dir="cache", use_fast=False)
