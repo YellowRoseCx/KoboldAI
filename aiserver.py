@@ -2472,14 +2472,11 @@ def patch_transformers():
 
             data = [tokenizer.decode(x) for x in input_ids]
             null_character = tokenizer.encode(chr(0))[0]
-            
             if 'completed' not in self.__dict__:
                 self.completed = [False]*len(input_ids)
-                
             for i in range(len(input_ids)):
                 if data[i][-6:] == " > You":
                     self.completed[i] = True
-                    
             if all(self.completed):
                 del self.completed
                 return True
