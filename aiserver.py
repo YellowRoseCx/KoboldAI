@@ -5841,7 +5841,7 @@ def raw_generate(
     found_entries: set = ()
 ) -> GenerationResult:
     # TODO: Support singleline outside of torch
-
+    print(f"Using Seed: {koboldai_vars.seed}")
     koboldai_vars.inference_config.do_core = is_core
     gen_settings = GenerationSettings(*(generation_settings or {}))
 
@@ -8700,7 +8700,7 @@ def set_seed():
             else:
                 __import__("torch").seed()
     koboldai_vars.seed = __import__("tpu_mtj_backend").get_rng_seed() if koboldai_vars.use_colab_tpu else __import__("torch").initial_seed()
-
+    print(f"initial seed: {koboldai_vars.seed}")
 #==================================================================#
 # Saving Story
 #==================================================================#
