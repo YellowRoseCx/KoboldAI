@@ -2664,7 +2664,7 @@ def patch_transformers():
         token_streamer = TokenStreamer(tokenizer=tokenizer)
 
         stopping_criteria.insert(0, ChatModeStopper(tokenizer=tokenizer))
-	stopping_criteria.insert(0, AdventureStopper(tokenizer=tokenizer))
+        stopping_criteria.insert(0, AdventureStopper(tokenizer=tokenizer))
         stopping_criteria.insert(0, SinglelineStopper(tokenizer=tokenizer))
         stopping_criteria.insert(0, self.kai_scanner)
         token_streamer = TokenStreamer(tokenizer=tokenizer)
