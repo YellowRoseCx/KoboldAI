@@ -2475,7 +2475,35 @@ def patch_transformers():
             data = [applyoutputformatting(utils.decodenewlines(tokenizer.decode(x[-1])), no_sentence_trimming=True, no_single_line=True) for x in input_ids]
             koboldai_vars.actions.stream_tokens(data)
             return False
-    
+
+    class AdventureStopper(StoppingCriteria):
+        def __init__(self, tokenizer):
+            self.tokenizer = tokenizer
+
+        def __call__(
+            self,
+            input_ids: torch.LongTensor,
+            scores: torch.FloatTensor,
+            **kwargs,
+        ) -> bool:
+
+            if not koboldai_vars.adventure:
+                return False
+
+            data = [tokenizer.decode(x) for x in input_ids]
+            null_character = tokenizer.encode(chr(0))[0]
+            if 'completed' not in self.__dict__:
+                self.completed = [False]*len(input_ids)
+            for i in range(len(input_ids)):
+                if data[i][-6:] == " > You":
+                    self.completed[i] = True
+            if all(self.completed):
+                del self.completed
+                return True
+            
+            return False
+
+
     class ChatModeStopper(StoppingCriteria):
         # A StoppingCriteria is used here because it seems to run after
         # everything has been evaluated score-wise. 
@@ -2636,6 +2664,7 @@ def patch_transformers():
         token_streamer = TokenStreamer(tokenizer=tokenizer)
 
         stopping_criteria.insert(0, ChatModeStopper(tokenizer=tokenizer))
+	stopping_criteria.insert(0, AdventureStopper(tokenizer=tokenizer))
         stopping_criteria.insert(0, SinglelineStopper(tokenizer=tokenizer))
         stopping_criteria.insert(0, self.kai_scanner)
         token_streamer = TokenStreamer(tokenizer=tokenizer)
