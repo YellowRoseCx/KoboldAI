@@ -6,9 +6,8 @@
 #### Installation
 In the command prompt/command line navigate to where you want the KoboldAI subfolder to be created.
 
-Note: do not run your command prompt as administrator/with elevated priviledges, reports suggest this leads to problems.
 
-`git clone https://github.com/0cc4m/KoboldAI -b latestgptq --recurse-submodules`
+`git clone https://github.com/YellowRoseCx/KoboldAI -b gptq4bit --recurse-submodules`
 
 `cd KoboldAI`
 
