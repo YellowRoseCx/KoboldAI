@@ -2494,7 +2494,7 @@ def patch_transformers():
             if 'completed' not in self.__dict__:
                 self.completed = [False]*len(input_ids)
             for i in range(len(input_ids)):
-                if data[i][-6:] == " > You":
+                if data[i][-5:] == "> You" or data[i][-5:] == "> you":
                     self.completed[i] = True
             if all(self.completed):
                 del self.completed
