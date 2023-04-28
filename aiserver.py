@@ -1494,6 +1494,18 @@ def general_startup(override_args=None):
     global args
     global enable_whitelist
     global allowed_ips
+    import configparser
+    #Figure out what git we're on if that's available
+    config = configparser.ConfigParser()
+    if os.path.exists('.git/config'):
+        config.read('.git/config')
+        koboldai_vars.git_repository = config['remote "origin"']['url']
+        for item in config.sections():
+            if "branch" in item:
+                koboldai_vars.git_branch = item.replace("branch ", "").replace('"', '')
+    
+        logger.info("Running on Repo: {} Branch: {}".format(koboldai_vars.git_repository, koboldai_vars.git_branch))
+    
     # Parsing Parameters
     parser = argparse.ArgumentParser(description="KoboldAI Server")
     parser.add_argument("--remote", action='store_true', help="Optimizes KoboldAI for Remote Play")
@@ -1620,7 +1632,7 @@ def general_startup(override_args=None):
         koboldai_vars.quiet = True
 
     if args.nobreakmodel:
-        koboldai_vars.nobreakmodel = True;
+        koboldai_vars.nobreakmodel = True
 
     if args.remote:
         koboldai_vars.host = True;
@@ -1809,7 +1821,7 @@ def get_model_info(model, directory=""):
                          'break_values': break_values, 'gpu_count': gpu_count,
                          'url': url, 'gpu_names': gpu_names, 'models_on_url': models_on_url, 'show_online_model_select': show_online_model_select,
                          'bit_8_available': koboldai_vars.bit_8_available if koboldai_vars.experimental_features else False,
-                         'bit_4_available': koboldai_vars.bit_4_available if koboldai_vars.experimental_features else False,
+                         'bit_4_available': koboldai_vars.bit_4_available,
                          'show_custom_model_box': show_custom_model_box})
     if send_horde_models:
         get_cluster_models({'key': key_value, 'url': default_url})
@@ -3203,9 +3215,8 @@ def load_model(use_gpu=True, gpu_layers=None, disk_layers=None, initial_load=Fal
                     gpu_layers_list = [int(l) for l in gpu_layers.split(",")]
                 except ValueError:
                     gpu_layers_list = [utils.num_layers(model_config)]
-                offload_4bit = use_4_bit and sum(gpu_layers_list) < utils.num_layers(model_config)
 
-                if offload_4bit:
+                if use_4_bit:
                     koboldai_vars.lazy_load = False
                     print("4-bit CPU offloader active")
                 
@@ -3240,28 +3251,16 @@ def load_model(use_gpu=True, gpu_layers=None, disk_layers=None, initial_load=Fal
 
                             print(f"Trying to load {koboldai_vars.model_type} model in 4-bit")
                             if koboldai_vars.model_type == "gptj":
-                                if offload_4bit:
-                                    model = load_quant_offload(gptj_load_quant, koboldai_vars.custmodpth, path_4bit, 4, groupsize, gpu_layers_list)
-                                else:
-                                    model = gptj_load_quant(koboldai_vars.custmodpth, path_4bit, 4, groupsize)
+                                model = load_quant_offload(gptj_load_quant, koboldai_vars.custmodpth, path_4bit, 4, groupsize, gpu_layers_list)
                                 tokenizer = AutoTokenizer.from_pretrained(koboldai_vars.custmodpth)
                             elif koboldai_vars.model_type == "gpt_neox":
-                                if offload_4bit:
-                                    model = load_quant_offload(gptneox_load_quant, koboldai_vars.custmodpth, path_4bit, 4, groupsize, gpu_layers_list)
-                                else:
-                                    model = gptneox_load_quant(koboldai_vars.custmodpth, path_4bit, 4, groupsize)
+                                model = load_quant_offload(gptneox_load_quant, koboldai_vars.custmodpth, path_4bit, 4, groupsize, gpu_layers_list)
                                 tokenizer = AutoTokenizer.from_pretrained(koboldai_vars.custmodpth)
                             elif koboldai_vars.model_type == "llama":
-                                if offload_4bit:
-                                    model = load_quant_offload(llama_load_quant, koboldai_vars.custmodpth, path_4bit, 4, groupsize, gpu_layers_list)
-                                else:
-                                    model = llama_load_quant(koboldai_vars.custmodpth, path_4bit, 4, groupsize)
+                                model = load_quant_offload(llama_load_quant, koboldai_vars.custmodpth, path_4bit, 4, groupsize, gpu_layers_list)
                                 tokenizer = LlamaTokenizer.from_pretrained(koboldai_vars.custmodpth)
                             elif koboldai_vars.model_type == "opt":
-                                if offload_4bit:
-                                    model = load_quant_offload(opt_load_quant, koboldai_vars.custmodpth, path_4bit, 4, groupsize, gpu_layers_list)
-                                else:
-                                    model = opt_load_quant(koboldai_vars.custmodpth, path_4bit, 4, groupsize)
+                                model = load_quant_offload(opt_load_quant, koboldai_vars.custmodpth, path_4bit, 4, groupsize, gpu_layers_list)
                                 tokenizer = AutoTokenizer.from_pretrained(koboldai_vars.custmodpth)
                             else:
                                 raise RuntimeError(f"4-bit load failed. Model type {koboldai_vars.model_type} not supported in 4-bit")
@@ -3369,7 +3368,7 @@ def load_model(use_gpu=True, gpu_layers=None, disk_layers=None, initial_load=Fal
                 patch_causallm(model)
 
                 if(koboldai_vars.hascuda):
-                    if offload_4bit:
+                    if use_4_bit:
                         koboldai_vars.modeldim = get_hidden_size_from_model(model)
                         generator = model.generate
                     elif(koboldai_vars.usegpu):
@@ -7623,16 +7622,6 @@ def loadRequest(loadpath, filename=None):
     if not loadpath:
         return
     
-    #Original UI only sends the story name and assumes it's always a .json file... here we check to see if it's a directory to load that way
-    if not isinstance(loadpath, dict) and not os.path.exists(loadpath):
-        if os.path.exists(loadpath.replace(".json", "")):
-            loadpath = loadpath.replace(".json", "")
-
-    if not isinstance(loadpath, dict) and os.path.isdir(loadpath):
-        if not valid_v3_story(loadpath):
-            raise RuntimeError(f"Tried to load {loadpath}, a non-save directory.")
-        koboldai_vars.update_story_path_structure(loadpath)
-        loadpath = os.path.join(loadpath, "story.json")
 
     start_time = time.time()
     # Leave Edit/Memory mode before continuing
@@ -7641,6 +7630,17 @@ def loadRequest(loadpath, filename=None):
     # Read file contents into JSON object
     start_time = time.time()
     if(isinstance(loadpath, str)):
+		#Original UI only sends the story name and assumes it's always a .json file... here we check to see if it's a directory to load that way
+        if not isinstance(loadpath, dict) and not os.path.exists(loadpath):
+            if os.path.exists(loadpath.replace(".json", "")):
+                loadpath = loadpath.replace(".json", "")
+
+        if not isinstance(loadpath, dict) and os.path.isdir(loadpath):
+            if not valid_v3_story(loadpath):
+                raise RuntimeError(f"Tried to load {loadpath}, a non-save directory.")
+            koboldai_vars.update_story_path_structure(loadpath)
+            loadpath = os.path.join(loadpath, "story.json")
+            
         with open(loadpath, "r", encoding="utf-8") as file:
             js = json.load(file)
             from_file=loadpath
@@ -8913,8 +8913,7 @@ def UI_2_back(data):
 def UI_2_redo(data):
     if koboldai_vars.aibusy:
         return
-    if len(koboldai_vars.actions.get_current_options()) == 1:
-        koboldai_vars.actions.use_option(0)
+    koboldai_vars.actions.go_forward()
     
 
 #==================================================================#
