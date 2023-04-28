@@ -1213,6 +1213,7 @@ class system_settings(settings):
                          'summary_tokenizer', 'use_colab_tpu', 'noai', 'disable_set_aibusy', 'cloudflare_link', 'tts_model',
                          'generating_image', 'bit_8_available', 'bit_4_available', 'host', 'hascuda', 'usegpu', 'rng_states',
                          'comregex_ai', 'comregex_ui', 'git_repository', 'git_branch']
+
     settings_name = "system"
     def __init__(self, socketio, koboldai_var):
         self._socketio = socketio
