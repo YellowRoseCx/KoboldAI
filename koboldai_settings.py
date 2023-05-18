@@ -1219,7 +1219,7 @@ class system_settings(settings):
                          'lua_koboldcore', 'sp', 'sp_length', '_horde_pid', 'horde_share', 'aibusy', 
                          'serverstarted', 'inference_config', 'image_pipeline', 'summarizer', 
                          'summary_tokenizer', 'use_colab_tpu', 'noai', 'disable_set_aibusy', 'cloudflare_link', 'tts_model',
-                         'generating_image', 'bit_8_available', 'bit_4_available', 'host', 'hascuda', 'usegpu', 'rng_states',
+                         'generating_image', 'bit_8_available', 'bit_4_available', 'bit_3_available', 'host', 'hascuda', 'usegpu', 'rng_states',
                          'comregex_ai', 'comregex_ui', 'git_repository', 'git_branch']
     settings_name = "system"
     def __init__(self, socketio, koboldai_var):
@@ -1303,12 +1303,20 @@ class system_settings(settings):
         self.keep_img_gen_in_memory = False
         self.cookies = {} #cookies for colab since colab's URL changes, cookies are lost
         self.experimental_features = False
+        # Check if repos/gptq exists for 3-bit mode
+        self.bit_3_available = True
+        try:
+            import gptq
+        except ImportError:
+            self.bit_3_available = False
+
         # Check if repos/gptq exists for 4-bit mode
         self.bit_4_available = True
         try:
             import gptq
         except ImportError:
             self.bit_4_available = False
+
 
         self.seen_messages = []
         self.git_repository = ""
