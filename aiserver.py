@@ -602,6 +602,7 @@ utils.socketio = socketio
 # Weird import position to steal koboldai_vars from utils
 from modeling.patches import patch_transformers
 from modeling.inference_models.hf_torch_4bit import load_model_gptq_settings
+from modeling.inference_models.hf_torch_3bit import load_model_gptq_settings
 
 
 old_socketio_on = socketio.on
@@ -1970,13 +1971,25 @@ def load_model(use_gpu=True, gpu_layers=None, disk_layers=None, initial_load=Fal
         if koboldai_vars.gptq_model:
             if not koboldai_vars.bit_4_available:
                 raise RuntimeError("4-bit not available")
+            if not koboldai_vars.bit_3_available:
+                raise RuntimeError("3-bit not available")
 
-            from modeling.inference_models.hf_torch_4bit import HFTorch4BitInferenceModel
-            model = HFTorch4BitInferenceModel(
-                koboldai_vars.model,
-                lazy_load=koboldai_vars.lazy_load,
-                low_mem=args.lowmem
-            )
+            if koboldai_vars.gptq_bits == 3:
+                from modeling.inference_models.hf_torch_3bit import HFTorch3BitInferenceModel
+                model = HFTorch3BitInferenceModel(
+                    koboldai_vars.model,
+                    lazy_load=koboldai_vars.lazy_load,
+                    low_mem=args.lowmem
+                )
+
+            if koboldai_vars.gptq_bits == 4:
+                from modeling.inference_models.hf_torch_4bit import HFTorch4BitInferenceModel
+                model = HFTorch4BitInferenceModel(
+                    koboldai_vars.model,
+                    lazy_load=koboldai_vars.lazy_load,
+                    low_mem=args.lowmem
+                )
+
         model.load(
             save_model=not (args.colab or args.cacheonly) or args.savemodel,
             initial_load=initial_load,
