@@ -61,7 +61,13 @@ def load_model_gptq_settings(path):
     gptq_file = False
     gptq_version = -1
 
-    gptq_legacy_files = glob.glob(os.path.join(path, "4bit*.pt")) + glob.glob(os.path.join(path, "4bit*.safetensors"))
+    pattern = r"(\d+)(?:bit)-(\d+)g"
+
+    gptq_legacy_files = []
+    for bit_value in [2, 3, 4, 6, 8]:
+        gptq_legacy_files += glob.glob(os.path.join(path, f"{bit_value}bit*.pt"))
+        gptq_legacy_files += glob.glob(os.path.join(path, f"{bit_value}bit*.safetensors"))
+
     if "gptq_bits" in js:
         gptq_model = True
         gptq_bits = js["gptq_bits"]
@@ -72,11 +78,15 @@ def load_model_gptq_settings(path):
         gptq_version = js.get("gptq_version", -1)
     elif gptq_legacy_files:
         gptq_model = True
-        gptq_bits = 4
         gptq_file = gptq_legacy_files[0]
         fname = Path(gptq_file).parts[-1]
-        g = re.findall("^(?:4bit)(?:-)(\\d+)(?:g-?)", fname)
-        gptq_groupsize = int(g[0]) if g else -1
+        match = re.search(pattern, fname)
+        if match:
+            gptq_bits = int(match.group(1))
+            gptq_groupsize = int(match.group(2))
+        else:
+            gptq_bits = 4
+            gptq_groupsize = -1
         gptq_version = -1
 
     return gptq_model, gptq_bits, gptq_groupsize, gptq_file, gptq_version
