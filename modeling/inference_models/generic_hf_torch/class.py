@@ -23,6 +23,7 @@ except ModuleNotFoundError as e:
 from modeling.inference_models.hf_torch import HFTorchInferenceModel
 
 model_backend_name = "Huggingface"
+model_backend_type = "Huggingface" #This should be a generic name in case multiple model backends are compatible (think Hugging Face Custom and Basic Hugging Face)
 
 class model_backend(HFTorchInferenceModel):
     
@@ -250,7 +251,7 @@ class model_backend(HFTorchInferenceModel):
 
         
         if utils.koboldai_vars.hascuda:
-            if self.usegpu:
+            if self.usegpu or self.nobreakmodel:
                 # Use just VRAM
                 self.model = self.model.half().to(utils.koboldai_vars.gpu_device)
             elif self.breakmodel:

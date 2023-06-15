@@ -626,14 +626,20 @@ from modeling.patches import patch_transformers
 import importlib
 model_backend_code = {}
 model_backends = {}
+model_backend_type_crosswalk = {}
 for module in os.listdir("./modeling/inference_models"):
     if not os.path.isfile(os.path.join("./modeling/inference_models",module)) and module != '__pycache__':
         try:
             model_backend_code[module] = importlib.import_module('modeling.inference_models.{}.class'.format(module))
             model_backends[model_backend_code[module].model_backend_name] = model_backend_code[module].model_backend()
-            if 'disable' in vars(model_backends[model_backend_code[module].model_backend_name]):
-                if model_backends[model_backend_code[module].model_backend_name].disable:
-                    del model_backends[model_backend_code[module].model_backend_name]
+            if 'disable' in vars(model_backends[model_backend_code[module].model_backend_name]) and model_backends[model_backend_code[module].model_backend_name].disable:
+                del model_backends[model_backend_code[module].model_backend_name]
+            else:
+                if model_backend_code[module].model_backend_type in model_backend_type_crosswalk:
+                    model_backend_type_crosswalk[model_backend_code[module].model_backend_type].append(model_backend_code[module].model_backend_name)
+                else:
+                    model_backend_type_crosswalk[model_backend_code[module].model_backend_type] = [model_backend_code[module].model_backend_name]
+                    
         except Exception:
             logger.error("Model Backend {} failed to load".format(module))
             logger.error(traceback.format_exc())
@@ -1389,9 +1395,7 @@ def general_startup(override_args=None):
     parser.add_argument("--summarizer_model", action='store', default="philschmid/bart-large-cnn-samsum", help="Huggingface model to use for summarization. Defaults to sshleifer/distilbart-cnn-12-6")
     parser.add_argument("--max_summary_length", action='store', default=75, help="Maximum size for summary to send to image generation")
     parser.add_argument("--multi_story", action='store_true', default=False, help="Allow multi-story mode (experimental)")
-    parser.add_argument("--peft", type=str, help="Specify the path or HuggingFace ID of a Peft to load it. Not supported on TPU. (Experimental)")
-    parser.add_argument("--trust_remote_code", action='store_true', default=False, help="Allow Huggingface Models to Execute Code (Insecure!)")  
-     
+    parser.add_argument("--peft", type=str, help="Specify the path or HuggingFace ID of a Peft to load it. Not supported on TPU. (Experimental)") 
     parser.add_argument('-f', action='store', help="option for compatability with colab memory profiles")
     parser.add_argument('-v', '--verbosity', action='count', default=0, help="The default logging level is ERROR or higher. This value increases the amount of logging seen in your screen")
     parser.add_argument('-q', '--quiesce', action='count', default=0, help="The default logging level is ERROR or higher. This value decreases the amount of logging seen in your screen")
@@ -1473,7 +1477,6 @@ def general_startup(override_args=None):
         args.remote = True;
         args.override_rename = True;
         args.override_delete = True;
-        args.nobreakmodel = True;
         args.quiet = True;
         args.lowmem = True;
         args.noaimenu = True;
@@ -1520,13 +1523,6 @@ def general_startup(override_args=None):
             allowed_ips = sorted(allowed_ips, key=lambda ip: int(''.join([i.zfill(3) for i in ip.split('.')])))
             print(f"Allowed IPs: {allowed_ips}")
 
-    if args.trust_remote_code:
-        logger.warning("EXECUTION OF UNSAFE REMOTE CODE IS ENABLED!!!")
-        logger.warning("You are not protected from Model Viruses in this mode!")
-        logger.warning("Exit the program now to abort execution!")
-        logger.warning("Only use this mode with models that you trust and verified!")
-        time.sleep(25)
-        koboldai_vars.trust_remote_code = True
     if args.cpu:
         koboldai_vars.use_colab_tpu = False
         koboldai_vars.hascuda = False
@@ -1682,7 +1678,6 @@ class RestrictedUnpickler(pickle.Unpickler):
             )
 
     def load(self, *args, **kwargs):
-        logger.info("Using safe unpickle")
         self.original_persistent_load = getattr(
             self, "persistent_load", pickle.Unpickler.persistent_load
         )
@@ -6222,6 +6217,7 @@ def UI_2_load_model_button(data):
 @socketio.on('select_model')
 @logger.catch
 def UI_2_select_model(data):
+    global model_backend_type_crosswalk #No idea why I have to make this a global where I don't for model_backends...
     logger.debug("Clicked on model entry: {}".format(data))
     if data["name"] in model_menu and data['ismenu'] == "true":
         emit("open_model_load_menu", {"items": [{**item.to_json(), **{"menu":data["name"]}} for item in model_menu[data["name"]] if item.should_show()]})
@@ -6231,8 +6227,9 @@ def UI_2_select_model(data):
             valid_loaders = {}
             if data['id'] in [item.name for sublist in model_menu for item in model_menu[sublist]]:
                 #Here if we have a model id that's in our menu, we explicitly use that backend
-                for model_backend in set([item.model_backend for sublist in model_menu for item in model_menu[sublist] if item.name == data['id']]):
-                    valid_loaders[model_backend] = model_backends[model_backend].get_requested_parameters(data["name"], data["path"] if 'path' in data else None, data["menu"])
+                for model_backend_type in set([item.model_backend for sublist in model_menu for item in model_menu[sublist] if item.name == data['id']]):
+                    for model_backend in model_backend_type_crosswalk[model_backend_type]:
+                        valid_loaders[model_backend] = model_backends[model_backend].get_requested_parameters(data["name"], data["path"] if 'path' in data else None, data["menu"])
                 emit("selected_model_info", {"model_backends": valid_loaders})
             else:
                 #Here we have a model that's not in our menu structure (either a custom model or a custom path
