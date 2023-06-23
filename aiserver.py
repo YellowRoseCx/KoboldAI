@@ -282,6 +282,7 @@ model_menu = {
         ],
     'nsfwlist': [
         MenuModel("Erebus 20B (NSFW)", "KoboldAI/GPT-NeoX-20B-Erebus", "64GB"),
+        MenuModel("Nerybus 13B (NSFW)", "KoboldAI/OPT-13B-Nerybus-Mix", "32GB"),
         MenuModel("Erebus 13B (NSFW)", "KoboldAI/OPT-13B-Erebus", "32GB"),
         MenuModel("Shinen FSD 13B (NSFW)", "KoboldAI/fairseq-dense-13B-Shinen", "32GB"),
         MenuModel("Erebus 6.7B (NSFW)", "KoboldAI/OPT-6.7B-Erebus", "16GB"),
@@ -1852,9 +1853,6 @@ def load_model(model_backend, initial_load=False):
     if not os.path.exists("./softprompts"):
         os.mkdir("./softprompts")
     koboldai_vars.splist = [[f, get_softprompt_desc(os.path.join("./softprompts", f),None,True)] for f in os.listdir("./softprompts") if os.path.isfile(os.path.join("./softprompts", f)) and valid_softprompt(os.path.join("./softprompts", f))]
-    if initial_load and koboldai_vars.cloudflare_link != "":
-        print(format(colors.GREEN) + "KoboldAI has finished loading and is available at the following link for UI 1: " + koboldai_vars.cloudflare_link + format(colors.END))
-        print(format(colors.GREEN) + "KoboldAI has finished loading and is available at the following link for UI 2: " + koboldai_vars.cloudflare_link + "/new_ui" + format(colors.END))
 
 
 # Setup IP Whitelisting
@@ -10860,6 +10858,8 @@ def run():
                     # delay the display of this message until after that step
                     logger.message(f"KoboldAI has finished loading and is available at the following link for UI 1: {cloudflare}")
                     logger.message(f"KoboldAI has finished loading and is available at the following link for UI 2: {cloudflare}/new_ui")
+                    logger.message(f"KoboldAI has finished loading and is available at the following link for KoboldAI Lite: {cloudflare}/lite")
+                    logger.message(f"KoboldAI has finished loading and is available at the following link for the API: {cloudflare}/api")
         else:
             logger.init_ok("Webserver", status="OK")
             logger.message(f"Webserver has started, you can now connect to this machine at port: {port}")
