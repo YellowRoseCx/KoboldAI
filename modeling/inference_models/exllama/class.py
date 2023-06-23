@@ -75,6 +75,25 @@ class model_backend(InferenceModel):
         self.model_name = ""
         self.path = None
 
+        self.post_token_hooks = [
+            PostTokenHooks.stream_tokens,
+        ]
+
+        self.stopper_hooks = [
+            Stoppers.core_stopper,
+            Stoppers.dynamic_wi_scanner,
+            Stoppers.singleline_stopper,
+            Stoppers.chat_mode_stopper,
+            Stoppers.stop_sequence_stopper,
+        ]
+
+        self.capabilties = ModelCapabilities(
+            embedding_manipulation=False,
+            post_token_hooks=True,
+            stopper_hooks=False,
+            post_token_probs=False,
+        )
+
     def is_valid(self, model_name, model_path, menu_path):
         gptq_model, _ = load_model_gptq_settings(model_path)
         try:
@@ -263,13 +282,10 @@ class model_backend(InferenceModel):
         self.generator.settings.top_p = gen_settings.top_p
         self.generator.settings.min_p = 0.0
 
-        self.generator.gen_begin(gen_in)
-
-        # from pudb.remote import set_trace
-        # set_trace(term_size=(200, 60))
+        self.generator.gen_begin_reuse(gen_in)
 
         for i in range(max_new):
-            logits = self.model.forward(self.generator.sequence[:, -1:], self.cache)
+            logits = self.model.forward(self.generator.sequence[:, -1:], self.generator.cache)
             logits[:, :, self.tokenizer.bos_token_id] = -10000.0
 
             logits = torch.unsqueeze(logits[0, -1, :], 0)
@@ -282,7 +298,13 @@ class model_backend(InferenceModel):
 
             self.generator.gen_accept_token(token)
 
+            self._post_token_gen(self.generator.sequence)
+
+            utils.koboldai_vars.generated_tkns += 1
+
             if token.item() == self.tokenizer.eos_token_id: break
+
+        utils.koboldai_vars.generated_tkns = max_new
 
         return GenerationResult(
             model=self,
@@ -361,6 +383,16 @@ class model_backend(InferenceModel):
                 self.model_config.device_map.layers.extend([f"cuda:{i}"] * l)
         self.model_config.device_map.lm_head = "cuda:0"
         self.model_config.device_map.norm = "cuda:0"
+
+        # Disable half2 for HIP
+        self.model_config.rmsnorm_no_half2 = bool(torch.version.hip)
+        self.model_config.rope_no_half2 = bool(torch.version.hip)
+        self.model_config.matmul_no_half2 = bool(torch.version.hip)
+        self.model_config.silu_no_half2 = bool(torch.version.hip)
+
+        # Disable scaled_dot_product_attention if torch version < 2
+        if torch.__version__.startswith("1."):
+            self.model_config.sdp_thd = 0
 
         self.model_name = parameters['custom_model_name'] if 'custom_model_name' in parameters else parameters['id']
         self.path = parameters['path'] if 'path' in parameters else None
