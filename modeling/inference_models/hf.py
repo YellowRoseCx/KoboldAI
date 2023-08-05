@@ -1,6 +1,10 @@
 import os, sys
 from typing import Optional
-from transformers import AutoConfig
+try:
+    from hf_bleeding_edge import AutoConfig
+except ImportError:
+    from transformers import AutoConfig
+
 import warnings
 import utils
 import json
@@ -17,6 +21,7 @@ class HFInferenceModel(InferenceModel):
         self.model_config = None
         #self.model_name = model_name
 
+        self.hf_torch = False
         self.model = None
         self.tokenizer = None
         self.badwordsids = koboldai_settings.badwordsids_default
@@ -157,7 +162,6 @@ class HFInferenceModel(InferenceModel):
         
     def set_input_parameters(self, parameters):
         if self.hf_torch and hasattr(self, "get_model_type") and self.get_model_type() != "gpt2":
-            import breakmodel
             layer_count = self.model_config["n_layer"] if isinstance(self.model_config, dict) else self.model_config.num_layers if hasattr(self.model_config, "num_layers") else self.model_config.n_layer if hasattr(self.model_config, "n_layer") else self.model_config.num_hidden_layers if hasattr(self.model_config, 'num_hidden_layers') else None
             if layer_count is not None and layer_count >= 0 and not self.nobreakmodel:
                 gpu_count = torch.cuda.device_count()
@@ -176,9 +180,8 @@ class HFInferenceModel(InferenceModel):
                 self.disk_layers = parameters['Disk_Layers'] if 'Disk_Layers' in parameters else 0    
                 if isinstance(self.disk_layers, str):
                     self.disk_layers = int(self.disk_layers) if self.disk_layers.isnumeric() else 0
-                breakmodel.gpu_blocks = layers
-                breakmodel.disk_blocks = self.disk_layers
-                self.usegpu = self.cpu_layers == 0 and breakmodel.disk_blocks == 0 and sum(self.layers)-self.layers[0] == 0
+                print("TODO: Allow config")
+                # self.usegpu = self.cpu_layers == 0 and breakmodel.disk_blocks == 0 and sum(self.layers)-self.layers[0] == 0
             self.model_type = self.get_model_type()
             self.breakmodel = ((self.model_type != 'gpt2') or self.model_type in ("gpt_neo", "gptj", "xglm", "opt")) and not self.nobreakmodel
             self.lazy_load = True
@@ -327,6 +330,11 @@ class HFInferenceModel(InferenceModel):
                 if any(c in str(k) for c in "[]")
             ]
 
+            try:
+                self.badwordsids.remove([self.tokenizer.pad_token_id])
+            except:
+                pass
+            
             if utils.koboldai_vars.newlinemode == "n":
                 self.badwordsids.append([self.tokenizer.eos_token_id])
 
@@ -379,7 +387,17 @@ class HFInferenceModel(InferenceModel):
                 revision=utils.koboldai_vars.revision,
                 cache_dir="cache",
             )
+
             self.model_type = self.model_config.model_type
+
+            if "gptq_bits" in dir(self.model_config):
+                self.gptq_model = True
+                self.gptq_bits = self.model_config.gptq_bits
+                self.gptq_groupsize = self.model_config.gptq_groupsize if getattr(self.model_config, "gptq_groupsize", False) else -1
+                self.gptq_version = self.model_config.gptq_version if getattr(self.model_config, "gptq_version", False) else 1
+                self.gptq_file = None
+            else:
+                self.gptq_model = False
         except ValueError:
             self.model_type = {
                 "NeoCustom": "gpt_neo",
